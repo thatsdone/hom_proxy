@@ -175,5 +175,6 @@ def message(client, userdata, msg):
                                                       'binary-msg'))
     response = pickle.loads(msg.payload)
     pending_requests[response['request_id']]['response'] = response['response']
+    pending_requests[response['request_id']]['status'] = response['status']
     #
     pending_requests[response['request_id']]['event'].set()

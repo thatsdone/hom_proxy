@@ -87,33 +87,37 @@ def handle_message(msg):
     data = pickle.loads(msg.payload)
     parsed_url = urllib.parse.urlparse(data['url'])
     request_id = data['request_id']
-    # TODO(thatsdone): Consider remote case
+    # TODO(thatsdone): Consider remote from this device case
     #host = parsed_url.hostname
     host = '127.0.0.1'
-    logger.debug('http://%s:%d%s' % (host, parsed_url.port,
-                                     parsed_url.path))
+    logger.debug('Executing: %s http://%s:%d%s' % (data['method'],
+                                                   host,
+                                                   parsed_url.port,
+                                                   parsed_url.path))
 
-    if data['method'] == 'GET':
-        r = requests.get('http://%s:%d%s' %
-                         (host, parsed_url.port, parsed_url.path),
-                         headers=data['headers'])
-    elif data['method'] == 'DELETE':
-        r = requests.delete('http://%s:%d%s' %
-                            (host, parsed_url.port, parsed_url.path),
-                            headers=data['headers'])
-    else:
-        loger.error('%s not supported (yet)')
-        # send back not supported response.
-
-    #logger.debug('handle_message: %s %s %s' % (r.status_code, r.headers,
-    #                                           r.text))
-    logger.info('"%s %s %s" %s' % (data['method'], data['url'],
-                                   data['http_version'], r.status_code))
-    topic = 'devices/%s/response' % (parsed_url.hostname)
+    if not data['method'] in ['GET', 'DELETE']:
+        loger.warn('%s not supported (yet)')
+        # but passthrough anyway
 
     response = dict()
-    response['response'] = r
-    response['request_id'] = request_id
+    url = 'http://%s:%d%s' % (host, parsed_url.port, parsed_url.path)
+    try:
+        r = requests.request(data['method'], url,
+                             headers=data['headers'], data=None # None for now
+                             )
+        response['status'] = 0
+        response['response'] = r
+        response['request_id'] = request_id
+        logger.info('"%s %s %s" %s' % (data['method'], data['url'],
+                                       data['http_version'], r.status_code))
+
+    except Exception as e:
+        logger.error(f'Exception: {e}')
+        response['status'] = -1
+        response['response'] = None
+        response['request_id'] = request_id
+
+    topic = 'devices/%s/response' % (parsed_url.hostname)
     data = pickle.dumps(response, protocol=pickle.HIGHEST_PROTOCOL)
     mqttc.publish(topic, data, args.qos)
 
@@ -135,7 +139,7 @@ if __name__ == "__main__":
     #parser.add_argument('--tls_secure', action='store_true')
     args = parser.parse_args()
     #
-    logger = logging.getLogger('hom_server')
+    logger = logging.getLogger('hom_device')
     log_level = "DEBUG" if args.debug else "INFO"
     logger.setLevel(log_level)
     formatter = logging.Formatter(
