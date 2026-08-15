@@ -24,6 +24,10 @@ hom_proxy composed of 2 components:
                                                        +-----------+ 
 ```
 
+Note that the target hostname (e.g. http://TARGET_HOAT_NAME:PORT) is taken from
+the topic that a hom_device.py instance ubscribes as
+'devices/RARGET_HOST_NAME/request'.
+
 ## Usage
 
 0. Prepare MQTT broker
@@ -38,8 +42,8 @@ hom_proxy composed of 2 components:
 * hom_proxy supports http only. Does not work for https.
   Consider using MQTT over TLS for now.
 * Currently hom_device.py forward requests to only localhost.
-* Tested using NanoMQ(https://nanomq.io/). 'GET /command/subscriptions'
-  works foronly NanoMQ.
+* Tested using NanoMQ(https://nanomq.io/).
+* Administration features like 'GET /command/subscriptions' work for NanoMQ only.
 
 ## License
 Apache License, Version 2.0
@@ -55,4 +59,6 @@ Masanori Itoh <masanori.itoh@gmail.com>
 * Waziup
   * https://github.com/Waziup/
 ## TODO
+* Support for MQTT over TLS.
+* Support large messages (more than 256MB).
 * many
