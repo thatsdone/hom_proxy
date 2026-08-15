@@ -145,7 +145,8 @@ if __name__ == "__main__":
     streamHandler.setFormatter(formatter)
     logger.addHandler(streamHandler)
     #
-    topic = 'devices/%s/request' % socket.gethostname().lower()
+    hostname = socket.gethostname().lower()
+    topic = 'devices/%s/request' % hostname
     #
     logger.info(f'Using... mqtt_host: {args.mqtt_host} mqtt_port: {args.mqtt_port} mqtt_version: {args.mqtt_version} topic: {topic} qos: {args.qos}')
 
@@ -159,7 +160,6 @@ if __name__ == "__main__":
     else:
         mqttv = mqtt.MQTTv5
 
-    hostname = socket.gethostname()
     mqttc = mqtt.Client(client_id=hostname,
                         protocol=mqttv, userdata=userdata,
                         callback_api_version=mqtt.CallbackAPIVersion.VERSION2)
