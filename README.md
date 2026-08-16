@@ -34,7 +34,7 @@ the topic that a hom_device.py instance ubscribes as
 1. Install dependency packages
    * `$ pip install -r requirements.txt`
 2. Start proxy server
-   * `$ env MQTT_HOST=MQTT_HOST_IP uvicorn main:app [--debug]`
+   * `$ env MQTT_HOST=MQTT_HOST_IP uvicorn main:app [--debug] [--port PORT]`
 3. Start device connector (tools/hom_device.py) on your IoT devices
    * `$ python3 hom_device.py --mqtt_host MQTT_HOST_IP [--debug]`
 
