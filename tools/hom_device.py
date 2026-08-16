@@ -132,11 +132,11 @@ if __name__ == "__main__":
     parser.add_argument('--topic', default=None)
     parser.add_argument('--qos', type=int, default=1)
     parser.add_argument('--timeout', type=int, default=60)
-    #parser.add_argument('--tls', action='store_true')
-    #parser.add_argument('--cacert', default=None)
-    #parser.add_argument('--cert', default=None)
-    #parser.add_argument('--key', default=None)
-    #parser.add_argument('--tls_secure', action='store_true')
+    parser.add_argument('--tls', action='store_true')
+    parser.add_argument('--cacert', default=None)
+    parser.add_argument('--cert', default=None)
+    parser.add_argument('--key', default=None)
+    parser.add_argument('--tls_secure', action='store_true')
     args = parser.parse_args()
     #
     logger = logging.getLogger('hom_device')
@@ -175,14 +175,15 @@ if __name__ == "__main__":
     mqttc.on_log = on_log
     mqttc.message_callback_add(topic, message)
 
-    #if args.tls:
-    #    if not args.cacert:
-    #        print('Specify --cacert')
-    #        sys.exit()
-    #    mqttc.tls_set(ca_certs=args.cacert,
-    #                  certfile=args.cert, keyfile=args.key)
-    #    if not args.tls_secure:
-    #        mqttc.tls_insecure_set(True)
+    if args.tls:
+        if not args.cacert:
+            print('Specify --cacert')
+            sys.exit()
+        mqttc.tls_set(ca_certs=args.cacert,
+                      certfile=args.cert, keyfile=args.key)
+        if not args.tls_secure:
+            print('DEBUG: tls_insecure_set True')
+            mqttc.tls_insecure_set(True)
 
     mqttc.connect(args.mqtt_host, args.mqtt_port, args.timeout)
 

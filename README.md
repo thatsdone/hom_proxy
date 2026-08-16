@@ -40,7 +40,7 @@ the topic that a hom_device.py instance ubscribes as
 
 ## Notes
 * hom_proxy supports http only. Does not work for https.
-  Consider using MQTT over TLS for now.
+  Consider using MQTT over TLS (mqtts) for now.
 * Currently hom_device.py forward requests to only localhost.
 * Tested using NanoMQ(https://nanomq.io/).
 * Administration features like 'GET /command/subscriptions' work for NanoMQ only.
@@ -59,6 +59,6 @@ Masanori Itoh <masanori.itoh@gmail.com>
 * Waziup
   * https://github.com/Waziup/
 ## TODO
-* Support for MQTT over TLS.
+* Refactor directory structure
 * Support large messages (more than 256MB).
 * many
