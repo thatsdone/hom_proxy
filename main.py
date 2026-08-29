@@ -61,7 +61,7 @@ async def lifespan(app: FastAPI):
         mqtt_timeout = 60
     else:
         mqtt_timeout = int(mqtt_timeout)
-    mqtt_qos = os.getenv('MQTT_qos')
+    mqtt_qos = os.getenv('MQTT_QOS')
     if not mqtt_qos:
         mqtt_qos = 1
     else:
