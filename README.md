@@ -24,7 +24,7 @@ hom_proxy composed of 2 components:
                                                        +-----------+ 
 ```
 
-Note that the target hostname (e.g. http://TARGET_HOAT_NAME:PORT) is taken from
+Note that the target hostname (e.g. http://TARGET_HOST_NAME:PORT) is taken from
 the topic that a hom_device.py instance ubscribes as
 'devices/RARGET_HOST_NAME/request'.
 
