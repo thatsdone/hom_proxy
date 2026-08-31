@@ -33,9 +33,9 @@ the topic that a hom_device.py instance ubscribes as
 0. Prepare MQTT broker
 1. Install dependency packages
    * `$ pip install -r requirements.txt`
-2. Start proxy server
+2. Start proxy server (in proxy)
    * `$ env MQTT_HOST=MQTT_HOST_IP uvicorn main:app [--debug] [--port PORT]`
-3. Start device connector (tools/hom_device.py) on your IoT devices
+3. Start device connector (in device) on your IoT devices
    * `$ python3 hom_device.py --mqtt_host MQTT_HOST_IP [--debug]`
 
 ## Notes
@@ -59,6 +59,5 @@ Masanori Itoh <masanori.itoh@gmail.com>
 * Waziup
   * https://github.com/Waziup/
 ## TODO
-* Refactor directory structure
 * Support large messages (more than 256MB).
 * many
