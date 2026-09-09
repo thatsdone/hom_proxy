@@ -33,7 +33,10 @@ import logging
 import socket
 import pickle
 import time
-#
+import threading
+
+import restapi
+
 global mqttc
 mqttc = None
 #
@@ -138,18 +141,17 @@ if __name__ == "__main__":
     parser.add_argument('--cert', default=None)
     parser.add_argument('--key', default=None)
     parser.add_argument('--tls_secure', action='store_true')
+    parser.add_argument('--admin_bind', default='0.0.0.0')
+    parser.add_argument('--admin_port', default=18082)
+
     args = parser.parse_args()
     #
-    logger = logging.getLogger('hom_device')
-    log_level = "DEBUG" if args.debug else "INFO"
-    logger.setLevel(log_level)
-    formatter = logging.Formatter(
-        fmt = '%(asctime)s.%(msecs)03d %(levelname)s: %(message)s',
+    logging.basicConfig(
+        level = "DEBUG" if args.debug else "INFO",
+        format = '%(asctime)s.%(msecs)03d %(levelname)s: %(funcName)s: %(message)s',
         datefmt='%Y/%m/%d %H:%M:%S')
-    streamHandler = logging.StreamHandler(sys.stdout)
-    streamHandler.setFormatter(formatter)
-    logger.addHandler(streamHandler)
-    #
+    logger = logging.getLogger(__name__)
+
     if not args.hostname:
         hostname = socket.gethostname().lower()
     else:
@@ -193,5 +195,9 @@ if __name__ == "__main__":
 
     logger.debug('Subscribing to %s' % (topic))
     mqttc.subscribe(topic, args.qos)
+
+    rest_th = threading.Thread(target=restapi.run_api_server,
+                               args=(args.admin_bind, args.admin_port, ))
+    rest_th.start()
 
     mqttc.loop_forever()
