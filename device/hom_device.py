@@ -126,6 +126,7 @@ def handle_message(msg):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='hom_device.py')
     parser.add_argument('--debug', action='store_true')
+    parser.add_argument('--hostname', default=None)
     parser.add_argument('--mqtt_version', type=int, default=5)
     parser.add_argument('--mqtt_host', default=None)
     parser.add_argument('--mqtt_port', type=int, default=1883)
@@ -149,7 +150,10 @@ if __name__ == "__main__":
     streamHandler.setFormatter(formatter)
     logger.addHandler(streamHandler)
     #
-    hostname = socket.gethostname().lower()
+    if not args.hostname:
+        hostname = socket.gethostname().lower()
+    else:
+        hostname = args.hostname
     topic = 'devices/%s/request' % hostname
     #
     logger.info(f'Using... mqtt_host: {args.mqtt_host} mqtt_port: {args.mqtt_port} mqtt_version: {args.mqtt_version} topic: {topic} qos: {args.qos}')
