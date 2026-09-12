@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 #
 # hom: A simple Http Over MQTT proxy
 #
@@ -29,7 +28,6 @@ hom_debug = os.getenv('HOM_DEBUG')
 if hom_debug and int(hom_debug) != 0:
     debug = True
 
-#
 logger = logging.getLogger('hom_server')
 log_level = 'DEBUG' if debug else 'INFO'
 logger.setLevel(log_level)
@@ -39,7 +37,7 @@ formatter = logging.Formatter(
 streamHandler = logging.StreamHandler(sys.stdout)
 streamHandler.setFormatter(formatter)
 logger.addHandler(streamHandler)
-#
+
 async_loop = None
 
 @asynccontextmanager
@@ -84,7 +82,7 @@ async def lifespan(app: FastAPI):
 
     tls = False
     
-    #if args.tls:
+q    #if args.tls:
     #    if not args.cacert:
     #        print('Specify --cacert')
     #        sys.exit()
@@ -142,9 +140,7 @@ app.include_router(commands.router, prefix='/command', tags=['Proxy Commands'])
 app.include_router(passthrough.router)#, tags=['Passthrough Handler'])
 
 
-#
-#
-#
+# MQTT handlers
 def on_log(mqttc, userdata, level, string):
     if not 'PING' in string or args.verbose:
         logger.debug('on_log(): %s : %s %s' % (userdata, level, string))
@@ -176,5 +172,5 @@ def message(client, userdata, msg):
     response = pickle.loads(msg.payload)
     pending_requests[response['request_id']]['response'] = response['response']
     pending_requests[response['request_id']]['status'] = response['status']
-    #
+
     pending_requests[response['request_id']]['event'].set()

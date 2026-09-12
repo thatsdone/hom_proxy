@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 #
 # hom_device.py: A stupid simple proxy for servers behind firewalls
 #
@@ -39,9 +38,7 @@ import restapi
 
 global mqttc
 mqttc = None
-#
-#
-#
+
 def on_log(mqttc, userdata, level, string):
     if not 'PING' in string or args.verbose:
         logger.debug('on_log(): %s : %s %s' % (userdata, level, string))
@@ -145,7 +142,7 @@ if __name__ == "__main__":
     parser.add_argument('--admin_port', default=18082)
 
     args = parser.parse_args()
-    #
+
     logging.basicConfig(
         level = "DEBUG" if args.debug else "INFO",
         format = '%(asctime)s.%(msecs)03d %(levelname)s: %(funcName)s: %(message)s',
@@ -157,7 +154,7 @@ if __name__ == "__main__":
     else:
         hostname = args.hostname
     topic = 'devices/%s/request' % hostname
-    #
+
     logger.info(f'Using... mqtt_host: {args.mqtt_host} mqtt_port: {args.mqtt_port} mqtt_version: {args.mqtt_version} topic: {topic} qos: {args.qos}')
 
     if not args.mqtt_host:

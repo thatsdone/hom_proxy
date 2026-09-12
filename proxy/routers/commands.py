@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 #
 # hom: A simple Http Over MQTT proxy
 #
@@ -14,7 +13,7 @@
 from typing import Dict, List
 from fastapi import APIRouter, Request
 from pydantic import BaseModel
-#
+
 import os
 import json
 import requests
@@ -36,12 +35,12 @@ class SubscriptionResponse(BaseModel):
 # NOTE: This is NanoMQ specific.
 @router.get("/subscriptions", response_model=SubscriptionResponse)
 def get_subscriptions(request: Request):
-    #
+
     nanomq_host = os.getenv('MQTT_HOST')
     if not nanomq_host:
         nanomq_host = '192.168.0.1'
     nanomq_api_port = 8081
-    #
+
     base_url = 'http://%s:%d/api/v4' % (nanomq_host, nanomq_api_port)
     headers = {}
     token = base64.b64encode(b'admin:public').decode('utf-8')

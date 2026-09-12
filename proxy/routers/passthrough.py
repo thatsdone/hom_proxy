@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 #
 # hom: A simple Http Over MQTT proxy
 #
@@ -47,12 +46,11 @@ async def passthrough(request: Request, proxy_path: str = ''):
             'body': ''
             }
         data = pickle.dumps(forward_request)
-        #
         topic = 'devices/%s/request' % (request.url.hostname)
         request.state.mqttc.publish(topic, data, qos=1)
         try:
             await asyncio.wait_for(event.wait(), timeout=10.0)
-            #
+
             if pending_requests[request_id]['status'] != 0:
                 return Response(
                     status_code = status.HTTP_502_BAD_GATEWAY
