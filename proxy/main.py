@@ -10,23 +10,27 @@
 #   Masanori Itoh <masanori.itoh@gmail.com>
 # TODO:
 #   * many
+import asyncio
+import logging
+import os
+import pickle
+import sys
+import urllib
+import uuid
+from contextlib import asynccontextmanager
+
+import paho.mqtt.client as mqtt
 from fastapi import FastAPI, Request
 from starlette.middleware.base import BaseHTTPMiddleware
-from routers import commands, passthrough
-from contextlib import asynccontextmanager
-import asyncio
 
-import os
-import sys
-import logging
-import paho.mqtt.client as mqtt
-import urllib
-import pickle
+from routers import commands, passthrough
+from shared import pending_requests
 
 debug = False
 hom_debug = os.getenv('HOM_DEBUG')
 if hom_debug and int(hom_debug) != 0:
     debug = True
+verbose = False
 
 logger = logging.getLogger('hom_server')
 log_level = 'DEBUG' if debug else 'INFO'
@@ -95,8 +99,8 @@ async def lifespan(app: FastAPI):
         mqttc.connect(mqtt_host, mqtt_port, mqtt_timeout)
         mqttc.loop_start()
         mqtt_state['mqttc'] = mqttc
-    except Exception as e:
-        logger.critical('Failed to connect to %s: %s' %(mqtt_host, e))
+    except Exception:
+        logger.exception(f'Failed to connect to {mqtt_host}')
         sys.exit()
 
     mqttc.message_callback_add('devices/+/response', message)
@@ -117,14 +121,9 @@ app = FastAPI(
     lifespan=lifespan
 )
 
-import uuid
-#
-#pending_request = dict()
-from shared import pending_requests
 
 class ForwardProxyMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next):
-        saved_path = request.scope['path']
         path_elm = urllib.parse.urlparse(request.scope['path']).path
         if request.scope['path'] != path_elm:
             request.scope['path'] = path_elm
@@ -137,38 +136,33 @@ mqtt_state = {}
 app.add_middleware(ForwardProxyMiddleware)
 
 app.include_router(commands.router, prefix='/command', tags=['Proxy Commands'])
-app.include_router(passthrough.router)#, tags=['Passthrough Handler'])
+app.include_router(passthrough.router)
 
 
 # MQTT handlers
 def on_log(mqttc, userdata, level, string):
-    if not 'PING' in string or args.verbose:
-        logger.debug('on_log(): %s : %s %s' % (userdata, level, string))
+    if not 'PING' in string or verbose:
+        logger.debug(f'on_log(): {userdata} : {level} {string}')
 
 # NOTE(thatsdone): assuming to use MQTTv5
 def on_connect(client, userdata, flags, rc, props):
-    logger.debug('on_connect(): %s : %s %s %s' % (userdata, flags, rc, props))
+    logger.debug(f'on_connect(): {userdata} : {flags} {rc} {props}')
 
 def on_disconnect(client, userdata, flags, rc, props):
-    logger.debug('on_disconnect(): %s : %s %s %s' % (userdata, flags, rc, props))
+    logger.debug(f'on_disconnect(): {userdata} : {flags} {rc} {props}')
 
 def on_publish(mqttc, userdata, mid, rc, props):
-    logger.debug('on_publish(): %s : %s %s %s' % (userdata, mid, rc, props))
+    logger.debug(f'on_publish(): {userdata} : {mid} {rc} {props}')
 
 def on_subscribe(mqttc, userdata, mid, rc, props):
-    logger.debug('on_subscribe(): %s : %s %s' % (userdata, rc, props))
+    logger.debug(f'on_subscribe(): {userdata} : {rc} {props}')
 
 def on_message(client, userdata, msg):
-    logger.debug('on_message(): %s : %s %s %s %s / %s' % (userdata, msg.topic,
-                                                         msg.mid, msg.timestamp,
-                                                         msg.retain,
-                                                         len(msg.payload)))
+    logger.debug(f'on_message(): {userdata} : {msg.topic} {msg.mid} {msg.timestamp} {msg.retain} / {len(msg.payload)}')
 
 def message(client, userdata, msg):
-    logger.debug('message(): %s : %s %s %s %s / %s' % (userdata, msg.topic,
-                                                      msg.mid, msg.timestamp,
-                                                      msg.retain,
-                                                      'binary-msg'))
+    logger.debug(f'message(): {userdata} : {msg.topic} {msg.mid} {msg.timestamp} {msg.retain} / binary-msg')
+
     response = pickle.loads(msg.payload)
     pending_requests[response['request_id']]['response'] = response['response']
     pending_requests[response['request_id']]['status'] = response['status']

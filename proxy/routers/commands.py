@@ -10,14 +10,13 @@
 #   Masanori Itoh <masanori.itoh@gmail.com>
 # TODO:
 #   * many
-from typing import Dict, List
+import base64
+import json
+import os
+
+import requests
 from fastapi import APIRouter, Request
 from pydantic import BaseModel
-
-import os
-import json
-import requests
-import base64
 
 from shared import pending_requests
 
@@ -30,7 +29,7 @@ class SubscriptionItem(BaseModel):
 
 class SubscriptionResponse(BaseModel):
     code: int
-    data: List[SubscriptionItem]
+    data: list[SubscriptionItem]
 
 # NOTE: This is NanoMQ specific.
 @router.get("/subscriptions", response_model=SubscriptionResponse)
@@ -41,10 +40,10 @@ def get_subscriptions(request: Request):
         nanomq_host = '192.168.0.1'
     nanomq_api_port = 8081
 
-    base_url = 'http://%s:%d/api/v4' % (nanomq_host, nanomq_api_port)
+    base_url = f'http://{nanomq_host}:{nanomq_api_port}/api/v4'
     headers = {}
     token = base64.b64encode(b'admin:public').decode('utf-8')
-    headers['Authorization'] = 'Basic %s' % (token)
+    headers['Authorization'] = f'Basic {token}'
     url = base_url + '/' + 'subscriptions'
     timeout = 3
     r = requests.get(url, headers=headers, timeout=timeout)

@@ -10,12 +10,11 @@
 #   Masanori Itoh <masanori.itoh@gmail.com>
 # TODO:
 #   * many
-from fastapi import APIRouter, Request, Response, status, HTTPException
 import asyncio
-import uuid
-import urllib
-import pickle
 import logging
+import pickle
+
+from fastapi import APIRouter, HTTPException, Request, Response, status
 
 router = APIRouter()
 
@@ -27,7 +26,7 @@ logger = logging.getLogger('hom_server')
 @router.api_route('/', methods=['GET', 'DELETE', 'POST', 'PUT'])
 @router.api_route('/{proxy_path:path}', methods=['GET', 'DELETE', 'POST', 'PUT'])
 async def passthrough(request: Request, proxy_path: str = ''):
-    request_id = request.state.request_id #str(uuid.uuid4())
+    request_id = request.state.request_id
     event = asyncio.Event()
     # create a map entry between the event and the request_id above
     pending_requests[request_id] = {
@@ -46,7 +45,7 @@ async def passthrough(request: Request, proxy_path: str = ''):
             'body': ''
             }
         data = pickle.dumps(forward_request)
-        topic = 'devices/%s/request' % (request.url.hostname)
+        topic = f'devices/{request.url.hostname}/request' 
         request.state.mqttc.publish(topic, data, qos=1)
         try:
             await asyncio.wait_for(event.wait(), timeout=10.0)
@@ -61,11 +60,11 @@ async def passthrough(request: Request, proxy_path: str = ''):
                 headers=pending_requests[request_id]['response'].headers,
                 content=pending_requests[request_id]['response'].text
             )
-        except Exception as e:
-           logger.error(f'Exception {e}')#, stack_info=True)
+        except Exception:
+           logger.exception('Unexpected errror while calling remote server')
            raise HTTPException(
                status_code = status.HTTP_503_SERVICE_UNAVAILABLE,
-               detail=f'Service unavailable'
+               detail='Service unavailable'
            )
 
     finally:

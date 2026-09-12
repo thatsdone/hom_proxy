@@ -10,6 +10,6 @@
 #   Masanori Itoh <masanori.itoh@gmail.com>
 # TODO:
 #   * many
-from typing import Dict, Any
+from typing import Any
 
-pending_requests: Dict[str, Dict[str, Any]] = {}
+pending_requests: dict[str, dict[str, Any]] = {}
