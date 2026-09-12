@@ -82,7 +82,7 @@ async def lifespan(app: FastAPI):
 
     tls = False
     
-q    #if args.tls:
+    #if args.tls:
     #    if not args.cacert:
     #        print('Specify --cacert')
     #        sys.exit()
