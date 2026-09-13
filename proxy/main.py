@@ -55,9 +55,7 @@ async def lifespan(app: FastAPI):
     mqtt_host = os.getenv('MQTT_HOST')
     if not mqtt_host:
         mqtt_host = '192.168.0.1'
-    mqtt_port  = os.getenv('MQTT_PORT')
-    if not mqtt_port:
-        mqtt_port = 1883
+    mqtt_port  = os.getenv('MQTT_PORT', 1883)
     mqtt_timeout = os.getenv('MQTT_TIMEOUT')
     if not mqtt_timeout:
         mqtt_timeout = 60
@@ -69,6 +67,18 @@ async def lifespan(app: FastAPI):
     else:
         mqtt_qos = int(mqtt_qos)
     
+    mqtt_tls = bool(os.getenv('MQTT_TLS', False))
+    print('DEBUG: mqtt_tls:', mqtt_tls)
+    if mqtt_tls and mqtt_port == 1883:
+        # set default mqtts port
+        mqtt_port = 8883
+    # cacert
+    mqtt_cacert = os.getenv('MQTT_CACERT', None)
+    mqtt_tls_insecure = bool(os.getenv('MQTT_TLS_INSECURE', False))
+    # client certificate and key
+    mqtt_cert = os.getenv('MQTT_CERT', None)
+    mqtt_key = os.getenv('MQTT_KEY', None)
+
     userdata = 'server'
     if mqtt_version == 3:
         mqttv = mqtt.MQTTv31
@@ -84,16 +94,12 @@ async def lifespan(app: FastAPI):
     mqttc.on_subscribe = on_subscribe
     mqttc.on_log = on_log
 
-    tls = False
-    
-    #if args.tls:
-    #    if not args.cacert:
-    #        print('Specify --cacert')
-    #        sys.exit()
-    #    mqttc.tls_set(ca_certs=args.cacert,
-    #                  certfile=args.cert, keyfile=args.key)
-    #    if not args.tls_secure:
-    #        mqttc.tls_insecure_set(True)
+    if mqtt_tls:
+        if not mqtt_cacert:
+            logger.info('Specify MQTT_CACERT if self-signed certificate.')
+        mqttc.tls_set(ca_certs=mqtt_cacert,
+                      certfile=mqtt_cert, keyfile=mqtt_key)
+        mqttc.tls_insecure_set(mqtt_tls_insecure)
 
     try:
         mqttc.connect(mqtt_host, mqtt_port, mqtt_timeout)
