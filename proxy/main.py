@@ -10,7 +10,6 @@
 #   Masanori Itoh <masanori.itoh@gmail.com>
 # TODO:
 #   * many
-import asyncio
 import logging
 import os
 import pickle
@@ -42,14 +41,9 @@ streamHandler = logging.StreamHandler(sys.stdout)
 streamHandler.setFormatter(formatter)
 logger.addHandler(streamHandler)
 
-async_loop = None
-
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     logger.info('Starting...')
-
-    global async_loop
-    async_loop = asyncio.get_running_loop()
 
     mqtt_version = 5
     config['mqtt_version'] = 5
