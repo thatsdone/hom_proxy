@@ -23,7 +23,7 @@ from fastapi import FastAPI, Request
 from starlette.middleware.base import BaseHTTPMiddleware
 
 from routers import commands, passthrough
-from shared import config, pending_requests
+from shared import config, devices, pending_requests
 
 config['debug'] = False
 hom_debug = os.getenv('HOM_DEBUG')
@@ -170,6 +170,16 @@ def on_subscribe(mqttc, userdata, mid, rc, props):
 
 def on_message(client, userdata, msg):
     logger.debug(f'on_message(): {userdata} : {msg.topic} {msg.mid} {msg.timestamp} {msg.retain} / {len(msg.payload)}')
+    # Note: msg.topic is 'hom_server/control' in this case.
+
+    message = pickle.loads(msg.payload)
+    if 'command' in message and 'device' in message:
+        logger.debug(message)
+        if message['command'] == 'set_status':
+            if not message['device'] in devices:
+                devices[message['device']] = {}
+            devices[message['device']]['status'] = message['status']
+            devices[message['device']]['timestamp'] = message['timestamp']
 
 def message(client, userdata, msg):
     logger.debug(f'message(): {userdata} : {msg.topic} {msg.mid} {msg.timestamp} {msg.retain} / binary-msg')

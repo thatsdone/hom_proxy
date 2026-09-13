@@ -18,7 +18,7 @@ from fastapi import APIRouter, HTTPException, Request, Response, status
 
 router = APIRouter()
 
-from shared import pending_requests
+from shared import config, devices, pending_requests
 
 logger = logging.getLogger('hom_server')
 
@@ -26,8 +26,13 @@ logger = logging.getLogger('hom_server')
 @router.api_route('/', methods=['GET', 'DELETE', 'POST', 'PUT'])
 @router.api_route('/{proxy_path:path}', methods=['GET', 'DELETE', 'POST', 'PUT'])
 async def passthrough(request: Request, proxy_path: str = ''):
-    # TODO: check if the remote target hostname is available,
-    #       otherwise return HTTP 502
+    # If unknown device(hostname), return HTTP 502.
+    if not request.url.hostname in devices or not devices[request.url.hostname] != 'online':
+        return Response(
+            status_code = status.HTTP_502_BAD_GATEWAY
+        )
+    # TODO: housekeeping of remote devices by looking up MQTT broker
+    #       subscription status
 
     request_id = request.state.request_id
     event = asyncio.Event()

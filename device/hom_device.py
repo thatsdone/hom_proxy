@@ -39,6 +39,8 @@ import restapi
 global mqttc
 mqttc = None
 
+hostname = socket.gethostname().lower()
+
 def on_log(mqttc, userdata, level, string):
     if not 'PING' in string or args.verbose:
         logger.debug('on_log(): %s : %s %s' % (userdata, level, string))
@@ -48,11 +50,11 @@ def on_connect(client, userdata, flags, rc, props):
     logger.debug('on_connect(): %s : %s %s %s' % (userdata, flags, rc, props))
     msg = dict()
     msg['command'] = 'set_status'
-    msg['device'] = socket.gethostname()
+    msg['device'] = hostname
     msg['status'] = 'online'
     msg['timestamp'] = time.time()
     data = pickle.dumps(msg, protocol=pickle.HIGHEST_PROTOCOL)
-    mqttc.publish('hom_server/control', args.qos)
+    mqttc.publish('hom_server/control', data)
 
 
 def on_disconnect(client, userdata, flags, rc, props):
@@ -149,10 +151,9 @@ if __name__ == "__main__":
         datefmt='%Y/%m/%d %H:%M:%S')
     logger = logging.getLogger(__name__)
 
-    if not args.hostname:
-        hostname = socket.gethostname().lower()
-    else:
+    if args.hostname:
         hostname = args.hostname
+
     topic = 'devices/%s/request' % hostname
 
     logger.info(f'Using... mqtt_host: {args.mqtt_host} mqtt_port: {args.mqtt_port} mqtt_version: {args.mqtt_version} topic: {topic} qos: {args.qos}')
