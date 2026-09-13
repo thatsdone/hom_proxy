@@ -24,16 +24,16 @@ from fastapi import FastAPI, Request
 from starlette.middleware.base import BaseHTTPMiddleware
 
 from routers import commands, passthrough
-from shared import pending_requests
+from shared import config, pending_requests
 
-debug = False
+config['debug'] = False
 hom_debug = os.getenv('HOM_DEBUG')
 if hom_debug and int(hom_debug) != 0:
-    debug = True
-verbose = False
+    config['debug'] = True
+config['verbose'] = False
 
 logger = logging.getLogger('hom_server')
-log_level = 'DEBUG' if debug else 'INFO'
+log_level = 'DEBUG' if config['debug'] else 'INFO'
 logger.setLevel(log_level)
 formatter = logging.Formatter(
     fmt = '%(asctime)s.%(msecs)03d %(levelname)s: %(message)s',
@@ -52,35 +52,44 @@ async def lifespan(app: FastAPI):
     async_loop = asyncio.get_running_loop()
 
     mqtt_version = 5
+    config['mqtt_version'] = 5
     mqtt_host = os.getenv('MQTT_HOST')
     if not mqtt_host:
         mqtt_host = '192.168.0.1'
+    config['mqtt_host'] = mqtt_host
     mqtt_port  = os.getenv('MQTT_PORT', 1883)
+    config['mqtt_tls'] = mqtt_port
     mqtt_timeout = os.getenv('MQTT_TIMEOUT')
     if not mqtt_timeout:
         mqtt_timeout = 60
     else:
         mqtt_timeout = int(mqtt_timeout)
+    config['mqtt_timeout'] = mqtt_timeout
     mqtt_qos = os.getenv('MQTT_QOS')
     if not mqtt_qos:
         mqtt_qos = 1
     else:
         mqtt_qos = int(mqtt_qos)
+    config['mqtt_qos'] = mqtt_qos
     
     mqtt_tls = bool(os.getenv('MQTT_TLS', False))
-    print('DEBUG: mqtt_tls:', mqtt_tls)
     if mqtt_tls and mqtt_port == 1883:
         # set default mqtts port
         mqtt_port = 8883
+    config['mqtt_port'] = mqtt_port
     # cacert
     mqtt_cacert = os.getenv('MQTT_CACERT', None)
+    config['mqtt_cacert'] = mqtt_cacert
     mqtt_tls_insecure = bool(os.getenv('MQTT_TLS_INSECURE', False))
+    config['mqtt_tls_insecure'] = mqtt_tls_insecure
     # client certificate and key
     mqtt_cert = os.getenv('MQTT_CERT', None)
+    config['mqtt_cert'] = mqtt_cert
     mqtt_key = os.getenv('MQTT_KEY', None)
+    config['mqtt_key'] = mqtt_key
 
     userdata = 'server'
-    if mqtt_version == 3:
+    if config['mqtt_version'] == 3:
         mqttv = mqtt.MQTTv31
     else:
         mqttv = mqtt.MQTTv5
@@ -94,17 +103,20 @@ async def lifespan(app: FastAPI):
     mqttc.on_subscribe = on_subscribe
     mqttc.on_log = on_log
 
-    if mqtt_tls:
-        if not mqtt_cacert:
+    if config['mqtt_tls']:
+        if not config['mqtt_cacert']:
             logger.info('Specify MQTT_CACERT if self-signed certificate.')
-        mqttc.tls_set(ca_certs=mqtt_cacert,
-                      certfile=mqtt_cert, keyfile=mqtt_key)
-        mqttc.tls_insecure_set(mqtt_tls_insecure)
+        mqttc.tls_set(ca_certs=config['mqtt_cacert'],
+                      certfile=config['mqtt_cert'],
+                      keyfile=config['mqtt_key'])
+        mqttc.tls_insecure_set(config['mqtt_tls_insecure'])
 
     try:
-        mqttc.connect(mqtt_host, mqtt_port, mqtt_timeout)
+        mqttc.connect(config['mqtt_host'],
+                      config['mqtt_port'],
+                      config['mqtt_timeout'])
         mqttc.loop_start()
-        mqtt_state['mqttc'] = mqttc
+        mqttc = mqttc
     except Exception:
         logger.exception(f'Failed to connect to {mqtt_host}')
         sys.exit()
@@ -118,8 +130,8 @@ async def lifespan(app: FastAPI):
 
     logger.info('Shutdown...')
 
-    mqtt_state['mqttc'].loop_stop()
-    mqtt_state['mqttc'].disconnect()
+    mqttc.loop_stop()
+    mqttc.disconnect()
     logger.info('Stop completed')
 
 app = FastAPI(
@@ -138,7 +150,6 @@ class ForwardProxyMiddleware(BaseHTTPMiddleware):
         return response
 
 
-mqtt_state = {}
 app.add_middleware(ForwardProxyMiddleware)
 
 app.include_router(commands.router, prefix='/command', tags=['Proxy Commands'])
@@ -147,7 +158,7 @@ app.include_router(passthrough.router)
 
 # MQTT handlers
 def on_log(mqttc, userdata, level, string):
-    if not 'PING' in string or verbose:
+    if not 'PING' in string or config['verbose']:
         logger.debug(f'on_log(): {userdata} : {level} {string}')
 
 # NOTE(thatsdone): assuming to use MQTTv5

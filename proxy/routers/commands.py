@@ -18,7 +18,7 @@ import requests
 from fastapi import APIRouter, Request
 from pydantic import BaseModel
 
-from shared import pending_requests
+from shared import config, pending_requests
 
 router = APIRouter()
 
@@ -35,13 +35,14 @@ class SubscriptionResponse(BaseModel):
 @router.get("/subscriptions", response_model=SubscriptionResponse)
 def get_subscriptions(request: Request):
 
-    nanomq_host = os.getenv('MQTT_HOST')
+    nanomq_host = config['mqtt_host']
     if not nanomq_host:
         nanomq_host = '192.168.0.1'
     nanomq_api_port = 8081
 
     base_url = f'http://{nanomq_host}:{nanomq_api_port}/api/v4'
     headers = {}
+    # TODO: Allow configuration of NanoMQ admin credentials
     token = base64.b64encode(b'admin:public').decode('utf-8')
     headers['Authorization'] = f'Basic {token}'
     url = base_url + '/' + 'subscriptions'

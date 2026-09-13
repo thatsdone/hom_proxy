@@ -13,3 +13,5 @@
 from typing import Any
 
 pending_requests: dict[str, dict[str, Any]] = {}
+devices: dict[str, dict[str, Any]] = {}
+config: dict[str, Any] = {}

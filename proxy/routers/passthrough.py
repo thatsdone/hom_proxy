@@ -26,6 +26,9 @@ logger = logging.getLogger('hom_server')
 @router.api_route('/', methods=['GET', 'DELETE', 'POST', 'PUT'])
 @router.api_route('/{proxy_path:path}', methods=['GET', 'DELETE', 'POST', 'PUT'])
 async def passthrough(request: Request, proxy_path: str = ''):
+    # TODO: check if the remote target hostname is available,
+    #       otherwise return HTTP 502
+
     request_id = request.state.request_id
     event = asyncio.Event()
     # create a map entry between the event and the request_id above
