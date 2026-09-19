@@ -35,9 +35,14 @@ import time
 import threading
 
 import restapi
+from chunked_mqtt import ChunkError, DEFAULT_MAX_CHUNK_SIZE, Reassembler, split_message
 
 global mqttc
 mqttc = None
+
+# Reassembles chunked messages received on the 'devices/HOSTNAME/request'
+# topic. See chunked_mqtt.py.
+reassembler = Reassembler()
 
 hostname = socket.gethostname().lower()
 
@@ -78,15 +83,23 @@ def message(client, userdata, msg):
                                                       msg.mid, msg.timestamp,
                                                       msg.retain,
                                                       'binary-msg.'))
-    handle_message(msg)
+    try:
+        payload = reassembler.add_chunk(msg.payload)
+    except ChunkError:
+        logger.exception('Discarding malformed/corrupt chunk on topic %s', msg.topic)
+        return
+    if payload is None:
+        # Not all chunks of this message have arrived yet.
+        return
+    handle_message(msg, payload)
 
-def handle_message(msg):
+def handle_message(msg, payload):
     logger.debug('handle_message(): %s : %s %s %s / %s' % (msg.topic,
                                                            msg.mid,
                                                            msg.timestamp,
                                                            msg.retain,
                                                            'binnary-msg'))
-    data = pickle.loads(msg.payload)
+    data = pickle.loads(payload)
     parsed_url = urllib.parse.urlparse(data['url'])
     request_id = data['request_id']
     # TODO(thatsdone): Consider remote from this device case
@@ -121,7 +134,8 @@ def handle_message(msg):
 
     topic = 'devices/%s/response' % (parsed_url.hostname)
     data = pickle.dumps(response, protocol=pickle.HIGHEST_PROTOCOL)
-    mqttc.publish(topic, data, args.qos)
+    for chunk in split_message(data, args.max_chunk_size):
+        mqttc.publish(topic, chunk, args.qos)
 
 
 
@@ -134,6 +148,11 @@ if __name__ == "__main__":
     parser.add_argument('--mqtt_port', type=int, default=1883)
     parser.add_argument('--topic', default=None)
     parser.add_argument('--qos', type=int, default=1)
+    parser.add_argument('--max_chunk_size', type=int, default=DEFAULT_MAX_CHUNK_SIZE,
+                        help='Max bytes per MQTT publish (envelope + data); '
+                             'larger payloads are split into sub-messages. '
+                             'Keep this under the broker\'s configured message '
+                             'size limit. Default: %(default)s')
     parser.add_argument('--timeout', type=int, default=60)
     parser.add_argument('--tls', action='store_true')
     parser.add_argument('--cacert', default=None)
@@ -156,7 +175,7 @@ if __name__ == "__main__":
 
     topic = 'devices/%s/request' % hostname
 
-    logger.info(f'Using... mqtt_host: {args.mqtt_host} mqtt_port: {args.mqtt_port} mqtt_version: {args.mqtt_version} topic: {topic} qos: {args.qos}')
+    logger.info(f'Using... mqtt_host: {args.mqtt_host} mqtt_port: {args.mqtt_port} mqtt_version: {args.mqtt_version} topic: {topic} qos: {args.qos} max_chunk_size: {args.max_chunk_size}')
 
     if not args.mqtt_host:
         print('Specify at least --host')
