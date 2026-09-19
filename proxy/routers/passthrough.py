@@ -18,6 +18,7 @@ from fastapi import APIRouter, HTTPException, Request, Response, status
 
 router = APIRouter()
 
+from chunked_mqtt import split_message
 from shared import config, devices, pending_requests
 
 logger = logging.getLogger('hom_server')
@@ -54,9 +55,10 @@ async def passthrough(request: Request, proxy_path: str = ''):
             }
         data = pickle.dumps(forward_request)
         topic = f'devices/{request.url.hostname}/request' 
-        request.state.mqttc.publish(topic, data, qos=1)
+        for chunk in split_message(data, config['mqtt_max_chunk_size']):
+            request.state.mqttc.publish(topic, chunk, qos=1)
         try:
-            await asyncio.wait_for(event.wait(), timeout=10.0)
+            await asyncio.wait_for(event.wait(), timeout=config['hom_request_timeout'])
 
             if pending_requests[request_id]['status'] != 0:
                 return Response(

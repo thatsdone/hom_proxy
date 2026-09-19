@@ -22,8 +22,13 @@ import paho.mqtt.client as mqtt
 from fastapi import FastAPI, Request
 from starlette.middleware.base import BaseHTTPMiddleware
 
+from chunked_mqtt import ChunkError, DEFAULT_MAX_CHUNK_SIZE, Reassembler
 from routers import commands, passthrough
 from shared import config, devices, pending_requests
+
+# Reassembles chunked messages received on the 'devices/+/response' topic.
+# See chunked_mqtt.py.
+reassembler = Reassembler()
 
 config['debug'] = False
 hom_debug = os.getenv('HOM_DEBUG')
@@ -65,6 +70,23 @@ async def lifespan(app: FastAPI):
     else:
         mqtt_qos = int(mqtt_qos)
     config['mqtt_qos'] = mqtt_qos
+
+    mqtt_max_chunk_size = os.getenv('MQTT_MAX_CHUNK_SIZE')
+    if not mqtt_max_chunk_size:
+        mqtt_max_chunk_size = DEFAULT_MAX_CHUNK_SIZE
+    else:
+        mqtt_max_chunk_size = int(mqtt_max_chunk_size)
+    config['mqtt_max_chunk_size'] = mqtt_max_chunk_size
+
+    # A large message now takes longer to arrive in full (it may cross
+    # the broker as many small chunks), so the time the proxy waits for
+    # a reply before giving up needs to be able to grow accordingly.
+    hom_request_timeout = os.getenv('HOM_REQUEST_TIMEOUT')
+    if not hom_request_timeout:
+        hom_request_timeout = 10.0
+    else:
+        hom_request_timeout = float(hom_request_timeout)
+    config['hom_request_timeout'] = hom_request_timeout
     
     mqtt_tls = bool(os.getenv('MQTT_TLS', False))
     if mqtt_tls and mqtt_port == 1883:
@@ -184,8 +206,24 @@ def on_message(client, userdata, msg):
 def message(client, userdata, msg):
     logger.debug(f'message(): {userdata} : {msg.topic} {msg.mid} {msg.timestamp} {msg.retain} / binary-msg')
 
-    response = pickle.loads(msg.payload)
-    pending_requests[response['request_id']]['response'] = response['response']
-    pending_requests[response['request_id']]['status'] = response['status']
+    try:
+        payload = reassembler.add_chunk(msg.payload)
+    except ChunkError:
+        logger.exception(f'Discarding malformed/corrupt chunk on topic {msg.topic}')
+        return
+    if payload is None:
+        # Not all chunks of this message have arrived yet.
+        return
 
-    pending_requests[response['request_id']]['event'].set()
+    response = pickle.loads(payload)
+    entry = pending_requests.get(response['request_id'])
+    if entry is None:
+        # The HTTP client that made this request has already timed out
+        # and moved on (more likely now that large responses can take
+        # a while to arrive in full). Nothing to deliver it to.
+        logger.warning('Received response for unknown or expired request_id %s',
+                       response['request_id'])
+        return
+    entry['response'] = response['response']
+    entry['status'] = response['status']
+    entry['event'].set()
