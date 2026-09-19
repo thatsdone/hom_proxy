@@ -98,7 +98,7 @@ def handle_message(msg):
                                                    parsed_url.path))
 
     if not data['method'] in ['GET', 'DELETE']:
-        loger.warn('%s not supported (yet)')
+        logger.warning('%s not supported (yet)', data['method'])
         # but passthrough anyway
 
     response = dict()
