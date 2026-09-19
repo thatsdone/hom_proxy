@@ -91,6 +91,8 @@ Specify at least MQTT_HOST to point your MQTT broker.
 * MQTT_PORT
 * MQTT_TIMEOUT
 * MQTT_QOS
+* MQTT_MAX_CHUNK_SIZE
+* HOM_REQUEST_TIMEOUT
 * MQTT_TLS
 * MQTT_TLS_INSECURE
 * MQTT_CACERT
@@ -135,6 +137,27 @@ options:
 ```
 
 
+### Large messages
+
+MQTT's protocol ceiling is 256MB, but almost no broker actually allows
+messages that large -- most default to something between a few hundred
+KB and a few MB. hom_proxy now transparently splits any payload larger
+than a configurable size into several MQTT sub-messages on the same
+topic, and reassembles them on the receiving end, so message size is no
+longer bounded by the broker's per-message limit.
+
+* Controlled by `MQTT_MAX_CHUNK_SIZE` (proxy, bytes, default 262144) and
+  `--max_chunk_size` (hom_device.py, same default). Set this comfortably
+  under your broker's configured message size limit.
+* `HOM_REQUEST_TIMEOUT` (proxy, seconds, default 10) controls how long
+  the proxy waits for a full response before returning HTTP 503. A very
+  large response, or a low `MQTT_MAX_CHUNK_SIZE`, means more chunks and
+  more time in transit, so this may need to be raised alongside it.
+* This is a wire-format change: a proxy and device connector must both
+  be running the version that supports chunked messages. They can no
+  longer interoperate with older, pre-chunking versions of the other
+  component.
+
 ## License
 Apache License, Version 2.0
 
@@ -149,5 +172,4 @@ Masanori Itoh <masanori.itoh@gmail.com>
 * Waziup
   * https://github.com/Waziup/
 ## TODO
-* Support large messages (more than 256MB).
 * many
