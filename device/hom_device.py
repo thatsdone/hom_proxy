@@ -38,11 +38,11 @@ hostname = socket.gethostname().lower()
 
 def on_log(mqttc, userdata, level, string):
     if not 'PING' in string or args.verbose:
-        logger.debug(f'on_log(): {userdata} : {level} {string}')
+        logger.debug(f'{userdata} : {level} {string}')
 
 # NOTE(thatsdone): assuming to use MQTTv5
 def on_connect(client, userdata, flags, rc, props):
-    logger.debug(f'on_connect(): {userdata} : {flags} {rc} {props}')
+    logger.debug(f'{userdata} : {flags} {rc} {props}')
     msg = {}
     msg['command'] = 'set_status'
     msg['device'] = hostname
@@ -53,25 +53,25 @@ def on_connect(client, userdata, flags, rc, props):
 
 
 def on_disconnect(client, userdata, flags, rc, props):
-    logger.debug(f'on_disconnect(): {userdata} : {flags} {rc} {props}')
+    logger.debug(f'{userdata} : {flags} {rc} {props}')
 
 def on_publish(client, userdata, mid, rc, props):
-    logger.debug(f'on_publish(): {userdata} : {mid} {rc} {props}')
+    logger.debug(f'{userdata} : {mid} {rc} {props}')
 
 def on_subscribe(client, userdata, mid, rc, props):
-    logger.debug(f'on_subscribe(): {userdata} : {rc} {props}')
+    logger.debug(f'{userdata} : {rc} {props}')
 
 def on_message(client, userdata, msg):
-    logger.debug(f'on_message(): {userdata} : {msg.topic} {msg.mid} {msg.timestamp} {msg.retain} / {msg.payload.decode()}')
+    logger.debug(f'{userdata} : {msg.topic} {msg.mid} {msg.timestamp} {msg.retain} / {msg.payload.decode()}')
     
 # FIXME(thatsdone): Callback API VERSION2 should have 4th argument.
 def message(client, userdata, msg):
-    logger.debug(f'message(): {userdata} : {msg.topic} {msg.mid} {msg.timestamp} {msg.retain} / binary-msg.')
+    logger.debug(f'{userdata} : {msg.topic} {msg.mid} {msg.timestamp} {msg.retain} / binary-msg.')
 
     handle_message(msg)
 
 def handle_message(msg):
-    logger.debug(f'handle_message(): {userdata} : {msg.topic} {msg.mid} {msg.timestamp} {msg.retain} / binary-msg.')
+    logger.debug(f'{userdata} : {msg.topic} {msg.mid} {msg.timestamp} {msg.retain} / binary-msg.')
 
     data = pickle.loads(msg.payload)
     parsed_url = urllib.parse.urlparse(data['url'])
@@ -174,7 +174,6 @@ if __name__ == "__main__":
         mqttc.tls_set(ca_certs=args.cacert,
                       certfile=args.cert, keyfile=args.key)
         if not args.tls_secure:
-            print('DEBUG: tls_insecure_set True')
             mqttc.tls_insecure_set(True)
 
     mqttc.connect(args.mqtt_host, args.mqtt_port, args.timeout)
