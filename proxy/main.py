@@ -70,7 +70,7 @@ async def lifespan(app: FastAPI):
     if mqtt_tls and mqtt_port == 1883:
         # set default mqtts port
         mqtt_port = 8883
-    config['mqtt_port'] = mqtt_port
+    config['mqtt_port'] = int(mqtt_port)
     # cacert
     mqtt_cacert = os.getenv('MQTT_CACERT', None)
     config['mqtt_cacert'] = mqtt_cacert
