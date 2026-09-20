@@ -18,37 +18,32 @@
 # Dependencies:
 #   * paho-mqtt: https://pypi.org/project/paho-mqtt/
 #
-import sys
 import argparse
-# common
-import paho.mqtt.client as mqtt
-# for client
-#from paho.mqtt.properties import Properties
-#from paho.mqtt.packettypes import PacketTypes
-
-import requests
-import urllib
 import logging
-import socket
 import pickle
-import time
+import socket
+import sys
 import threading
+import time
+import urllib
+
+import paho.mqtt.client as mqtt
+import requests
 
 import restapi
 
-global mqttc
 mqttc = None
 
 hostname = socket.gethostname().lower()
 
 def on_log(mqttc, userdata, level, string):
     if not 'PING' in string or args.verbose:
-        logger.debug('on_log(): %s : %s %s' % (userdata, level, string))
+        logger.debug(f'on_log(): {userdata} : {level} {string}')
 
 # NOTE(thatsdone): assuming to use MQTTv5
 def on_connect(client, userdata, flags, rc, props):
-    logger.debug('on_connect(): %s : %s %s %s' % (userdata, flags, rc, props))
-    msg = dict()
+    logger.debug(f'on_connect(): {userdata} : {flags} {rc} {props}')
+    msg = {}
     msg['command'] = 'set_status'
     msg['device'] = hostname
     msg['status'] = 'online'
@@ -58,51 +53,40 @@ def on_connect(client, userdata, flags, rc, props):
 
 
 def on_disconnect(client, userdata, flags, rc, props):
-    logger.debug('on_disconnect(): %s : %s %s %s' % (userdata, flags, rc, props))
+    logger.debug(f'on_disconnect(): {userdata} : {flags} {rc} {props}')
 
 def on_publish(client, userdata, mid, rc, props):
-    logger.debug('on_publish(): %s : %s %s %s' % (userdata, mid, rc, props))
+    logger.debug(f'on_publish(): {userdata} : {mid} {rc} {props}')
 
 def on_subscribe(client, userdata, mid, rc, props):
-    logger.debug('on_subscribe(): %s : %s %s' % (userdata, rc, props))
+    logger.debug(f'on_subscribe(): {userdata} : {rc} {props}')
 
 def on_message(client, userdata, msg):
-    logger.debug('on_message(): %s : %s %s %s %s / %s' % (userdata, msg.topic,
-                                                         msg.mid, msg.timestamp,
-                                                         msg.retain,
-                                                         msg.payload.decode()))
+    logger.debug(f'on_message(): {userdata} : {msg.topic} {msg.mid} {msg.timestamp} {msg.retain} / {msg.payload.decode()}')
     
 # FIXME(thatsdone): Callback API VERSION2 should have 4th argument.
 def message(client, userdata, msg):
-    logger.debug('message(): %s : %s %s %s %s / %s' % (userdata, msg.topic,
-                                                      msg.mid, msg.timestamp,
-                                                      msg.retain,
-                                                      'binary-msg.'))
+    logger.debug(f'message(): {userdata} : {msg.topic} {msg.mid} {msg.timestamp} {msg.retain} / binary-msg.')
+
     handle_message(msg)
 
 def handle_message(msg):
-    logger.debug('handle_message(): %s : %s %s %s / %s' % (msg.topic,
-                                                           msg.mid,
-                                                           msg.timestamp,
-                                                           msg.retain,
-                                                           'binnary-msg'))
+    logger.debug(f'handle_message(): {userdata} : {msg.topic} {msg.mid} {msg.timestamp} {msg.retain} / binary-msg.')
+
     data = pickle.loads(msg.payload)
     parsed_url = urllib.parse.urlparse(data['url'])
     request_id = data['request_id']
     # TODO(thatsdone): Consider remote from this device case
     #host = parsed_url.hostname
     host = '127.0.0.1'
-    logger.debug('Executing: %s http://%s:%d%s' % (data['method'],
-                                                   host,
-                                                   parsed_url.port,
-                                                   parsed_url.path))
+    logger.debug(f'Executing: {data['method']} http://{host}:{parsed_url.port}{parsed_url.path}')
 
     if not data['method'] in ['GET', 'DELETE']:
-        loger.warn('%s not supported (yet)')
+        logger.warning('%s not supported (yet)')
         # but passthrough anyway
 
-    response = dict()
-    url = 'http://%s:%d%s' % (host, parsed_url.port, parsed_url.path)
+    response = {}
+    url = f'http://{host}:{parsed_url.port}{parsed_url.path}'
     try:
         r = requests.request(data['method'], url,
                              headers=data['headers'], data=None # None for now
@@ -110,16 +94,20 @@ def handle_message(msg):
         response['status'] = 0
         response['response'] = r
         response['request_id'] = request_id
-        logger.info('"%s %s %s" %s' % (data['method'], data['url'],
-                                       data['http_version'], r.status_code))
+        logger.info(f"{data['method']} {data['url']} {data['http_version']} {r.status_code}")
 
-    except Exception as e:
-        logger.error(f'Exception: {e}')
+    except requests.exceptions.HTTPError as httpe:
+        logger.error(f'HTTPError: {httpe}')
+        response['status'] = -1
+        response['response'] = None
+        response['request_id'] = request_id
+    except requests.exceptions.RequestException as re:
+        logger.error(f'RequestExceptionError: {re}')
         response['status'] = -1
         response['response'] = None
         response['request_id'] = request_id
 
-    topic = 'devices/%s/response' % (parsed_url.hostname)
+    topic = f'devices/{parsed_url.hostname}/response'
     data = pickle.dumps(response, protocol=pickle.HIGHEST_PROTOCOL)
     mqttc.publish(topic, data, args.qos)
 
@@ -154,7 +142,7 @@ if __name__ == "__main__":
     if args.hostname:
         hostname = args.hostname
 
-    topic = 'devices/%s/request' % hostname
+    topic = f'devices/{hostname}/request'
 
     logger.info(f'Using... mqtt_host: {args.mqtt_host} mqtt_port: {args.mqtt_port} mqtt_version: {args.mqtt_version} topic: {topic} qos: {args.qos}')
 
@@ -191,7 +179,7 @@ if __name__ == "__main__":
 
     mqttc.connect(args.mqtt_host, args.mqtt_port, args.timeout)
 
-    logger.debug('Subscribing to %s' % (topic))
+    logger.debug(f'Subscribing to {topic}')
     mqttc.subscribe(topic, args.qos)
 
     rest_th = threading.Thread(target=restapi.run_api_server,
