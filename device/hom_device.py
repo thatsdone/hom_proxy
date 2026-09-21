@@ -19,6 +19,7 @@
 #   * paho-mqtt: https://pypi.org/project/paho-mqtt/
 #
 import argparse
+import asyncio
 import logging
 import pickle
 import socket
@@ -27,9 +28,8 @@ import threading
 import time
 import urllib
 
+import httpx
 import paho.mqtt.client as mqtt
-import requests
-
 import restapi
 
 mqttc = None
@@ -68,15 +68,26 @@ def on_message(client, userdata, msg):
 def message(client, userdata, msg):
     logger.debug(f'{userdata} : {msg.topic} {msg.mid} {msg.timestamp} {msg.retain} / binary-msg.')
 
-    handle_message(msg)
+    if evloop and evloop.is_running():
+        asyncio.run_coroutine_threadsafe(process_data_async(msg), evloop)
+    # TODO: return 502 or 503?
 
-def handle_message(msg):
-    logger.debug(f'{userdata} : {msg.topic} {msg.mid} {msg.timestamp} {msg.retain} / binary-msg.')
+evloop = None
+def async_event_thread():
+    logger.debug('Creating async event context')
+    global evloop
+    evloop = asyncio.new_event_loop()
+    asyncio.set_event_loop(evloop)
+    evloop.run_forever()
+
+async def process_data_async(msg):
 
     data = pickle.loads(msg.payload)
     parsed_url = urllib.parse.urlparse(data['url'])
+    queries = urllib.parse.parse_qsl(parsed_url.query)
     request_id = data['request_id']
     # TODO(thatsdone): Consider remote from this device case
+    #                  Maybe using 'Host' header could be a reasonable idea.
     #host = parsed_url.hostname
     host = '127.0.0.1'
     logger.debug(f'Executing: {data['method']} http://{host}:{parsed_url.port}{parsed_url.path}')
@@ -86,31 +97,33 @@ def handle_message(msg):
         # but passthrough anyway
 
     response = {}
-    url = f'http://{host}:{parsed_url.port}{parsed_url.path}'
-    try:
-        r = requests.request(data['method'], url,
-                             headers=data['headers'], data=None # None for now
-                             )
-        response['status'] = 0
-        response['response'] = r
-        response['request_id'] = request_id
-        logger.info(f"{data['method']} {data['url']} {data['http_version']} {r.status_code}")
+    response['status'] = -1
+    response['response'] = None
+    response['request_id'] = request_id
 
-    except requests.exceptions.HTTPError as httpe:
-        logger.error(f'HTTPError: {httpe}')
-        response['status'] = -1
-        response['response'] = None
-        response['request_id'] = request_id
-    except requests.exceptions.RequestException as re:
-        logger.error(f'RequestExceptionError: {re}')
-        response['status'] = -1
-        response['response'] = None
-        response['request_id'] = request_id
+    url = f'http://{host}:{parsed_url.port}{parsed_url.path}'
+
+    client = httpx.AsyncClient()
+    try:
+        backend_resp = await client.request(
+            method=data['method'],
+            url=url,
+            headers=data['headers'],
+            #NOTE: urllib.parse returns query for params below.
+            params=queries,
+            data=data['body'],
+            timeout=5.0
+            )
+        response['status'] = 0
+        response['response'] = backend_resp
+        logger.debug(f"{data['method']} {data['url']} {data['http_version']} {backend_resp.status_code}")
+
+    except httpx.HTTPError as he:
+        logger.error(f'HTTPError: {he}')
 
     topic = f'devices/{parsed_url.hostname}/response'
     data = pickle.dumps(response, protocol=pickle.HIGHEST_PROTOCOL)
     mqttc.publish(topic, data, args.qos)
-
 
 
 if __name__ == "__main__":
@@ -138,6 +151,13 @@ if __name__ == "__main__":
         format = '%(asctime)s.%(msecs)03d %(levelname)s: %(funcName)s: %(message)s',
         datefmt='%Y/%m/%d %H:%M:%S')
     logger = logging.getLogger(__name__)
+    logging.getLogger('urllib3').setLevel(logging.WARNING)
+    logging.getLogger('httpx').setLevel(logging.WARNING)
+    logging.getLogger('httpcore').setLevel(logging.WARNING)
+    logging.getLogger('asyncio').setLevel(logging.WARNING)
+
+    async_th = threading.Thread(target=async_event_thread, daemon=True)
+    async_th.start()
 
     if args.hostname:
         hostname = args.hostname
