@@ -12,14 +12,16 @@
 #   * many
 import base64
 import json
+import logging
 import os
 
 import requests
 from fastapi import APIRouter, Request
 from pydantic import BaseModel
 
-from shared import config, pending_requests
+from shared import config, devices, pending_requests
 
+logger = logging.getLogger('hom_server')
 router = APIRouter()
 
 class SubscriptionItem(BaseModel):
@@ -31,26 +33,24 @@ class SubscriptionResponse(BaseModel):
     code: int
     data: list[SubscriptionItem]
 
-# NOTE: This is NanoMQ specific.
 @router.get("/subscriptions", response_model=SubscriptionResponse)
 def get_subscriptions(request: Request):
 
-    nanomq_host = config['mqtt_host']
-    if not nanomq_host:
-        nanomq_host = '192.168.0.1'
-    nanomq_api_port = 8081
+    res = config['mqtt_driver'].get_subscriptions()
 
-    base_url = f'http://{nanomq_host}:{nanomq_api_port}/api/v4'
-    headers = {}
-    # TODO: Allow configuration of NanoMQ admin credentials
-    token = base64.b64encode(b'admin:public').decode('utf-8')
-    headers['Authorization'] = f'Basic {token}'
-    url = base_url + '/' + 'subscriptions'
-    timeout = 3
-    r = requests.get(url, headers=headers, timeout=timeout)
-    return json.loads(r.text)
-
+    return res
 
 @router.get('/status')
 def get_status(request: Request):
-    return {'pending_request_count': len(pending_requests.keys())}
+    res = {
+        'pending_request_count': len(pending_requests.keys())
+    }
+    logger.debug(f'devices: {devices}')
+    res['devices'] = []
+    for device in devices.keys():
+        logger.debug(type(device))
+        res['devices'].append({'hostname': device,
+                               'status': devices[device]['status'],
+                               'timestamp': devices[device]['timestamp']
+                               })
+    return res

@@ -10,10 +10,12 @@
 #   Masanori Itoh <masanori.itoh@gmail.com>
 # TODO:
 #   * many
+import importlib
 import logging
 import os
 import pickle
 import sys
+import time
 import urllib
 import uuid
 from contextlib import asynccontextmanager
@@ -44,6 +46,12 @@ logger.addHandler(streamHandler)
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     logger.info('Starting...')
+
+    mqtt_driver_name = os.getenv('MQTT_DRIVER', 'nanomq')
+    config['mqtt_driver'] = importlib.import_module(f'lib.driver_{mqtt_driver_name}')
+    if not config['mqtt_driver']:
+        logger.error(f'Failed to load MQTT_DRIVER: {mqtt_driver_name}')
+        sys.exit()
 
     mqtt_version = 5
     config['mqtt_version'] = 5
@@ -119,6 +127,18 @@ async def lifespan(app: FastAPI):
 
     mqttc.subscribe('devices/+/response', mqtt_qos)
     mqttc.subscribe('hom_server/control', mqtt_qos)
+
+    subscriptions = config['mqtt_driver'].get_subscriptions()
+    for device in subscriptions.get('data'):
+        if device.get('clientid', None) != 'hom_server':
+            topic = device.get('topic', None)
+            if topic:
+                device_name = topic.split('/')[1]
+                logger.debug(f'device detected. {device_name}')
+                if not device_name in devices:
+                    devices[device_name] = {}
+                devices[device_name]['status'] = 'online'
+                devices[device_name]['timestamp'] = time.time()
 
     yield {'mqttc': mqttc}
 

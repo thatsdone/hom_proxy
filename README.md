@@ -87,6 +87,7 @@ The proxy server of hom_proxy refers the following environment variables.
 Specify at least MQTT_HOST to point your MQTT broker.
 
 * HOM_DEBUG
+* MQTT_DRIVER
 * MQTT_HOST
 * MQTT_PORT
 * MQTT_TIMEOUT
