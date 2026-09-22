@@ -76,7 +76,7 @@ not the IP address of the device.
 ### Notes
 * hom_proxy supports http only. Does not work for https.
   Consider using MQTT over TLS (mqtts) as of now.
-* Currently hom_device.py forwards requests to only localhost.
+* By default, hom_device.py forwards requests to localhost. Use 'X-Forwarded-For' header to pass requests to other devices.
 * Tested using NanoMQ(https://nanomq.io/).
 * Administration features like 'GET /command/subscriptions' work for NanoMQ only.
 
@@ -150,4 +150,4 @@ Masanori Itoh <masanori.itoh@gmail.com>
   * https://github.com/Waziup/
 ## TODO
 * Support large messages (more than 256MB).
-* many
+* many (see issues)

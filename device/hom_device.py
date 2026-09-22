@@ -69,7 +69,10 @@ def message(client, userdata, msg):
     logger.debug(f'{userdata} : {msg.topic} {msg.mid} {msg.timestamp} {msg.retain} / binary-msg.')
 
     if evloop and evloop.is_running():
+        logger.debug('calling process_data_async()')
         asyncio.run_coroutine_threadsafe(process_data_async(msg), evloop)
+    else:
+        logger.error('evloop is inactive')
     # TODO: return 502 or 503?
 
 evloop = None
@@ -81,17 +84,24 @@ def async_event_thread():
     evloop.run_forever()
 
 async def process_data_async(msg):
-
     data = pickle.loads(msg.payload)
-    parsed_url = urllib.parse.urlparse(data['url'])
+    parsed_url = urllib.parse.urlparse(str(data['url']))
     queries = urllib.parse.parse_qsl(parsed_url.query)
     request_id = data['request_id']
-    # TODO(thatsdone): Consider remote from this device case
-    #                  Maybe using 'Host' header could be a reasonable idea.
-    #host = parsed_url.hostname
-    host = '127.0.0.1'
-    logger.debug(f'Executing: {data['method']} http://{host}:{parsed_url.port}{parsed_url.path}')
+    url = None
+    method = data['method']
+    if 'x-forwarded-for' in data['headers']:
+        real_target = data['headers']['x-forwarded-for']
+        if ':' in real_target:
+            url = f'http://{real_target}{parsed_url.path}'
+        else:
+            # Normally, hom_proxy returns HTTP 502 for this case.
+            logger.warning('x-forwarded-for does not contain port. Using 80')
+            url = f'http://{real_target}{parsed_url.path}'
+    else:
+        url = f'http://127.0.0.1:{parsed_url.port}{parsed_url.path}'
 
+    logger.debug(f"Executing: {method} {url}")
     if not data['method'] in ['GET', 'DELETE']:
         logger.warning('%s not supported (yet)')
         # but passthrough anyway
@@ -101,15 +111,13 @@ async def process_data_async(msg):
     response['response'] = None
     response['request_id'] = request_id
 
-    url = f'http://{host}:{parsed_url.port}{parsed_url.path}'
-
     client = httpx.AsyncClient()
     try:
         backend_resp = await client.request(
             method=data['method'],
             url=url,
             headers=data['headers'],
-            #NOTE: urllib.parse returns query for params below.
+            #NOTE: urllib.parse returns 'query' for 'params' below.
             params=queries,
             data=data['body'],
             timeout=5.0
@@ -121,7 +129,7 @@ async def process_data_async(msg):
     except httpx.HTTPError as he:
         logger.error(f'HTTPError: {he}')
 
-    topic = f'devices/{parsed_url.hostname}/response'
+    topic = f'devices/{args.hostname}/response'
     data = pickle.dumps(response, protocol=pickle.HIGHEST_PROTOCOL)
     mqttc.publish(topic, data, args.qos)
 

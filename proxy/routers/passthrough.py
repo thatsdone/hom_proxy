@@ -34,6 +34,11 @@ async def passthrough(request: Request, proxy_path: str = ''):
     # TODO: housekeeping of remote devices by looking up MQTT broker
     #       subscription status
 
+    target_url = str(request.url)
+    if 'x-forwarded-for' in request.headers:
+        real_target = request.headers['x-forwarded-for']
+        target_url = request.url.replace(netloc=real_target)
+    logger.debug(f'target_url: {target_url}')
     request_id = request.state.request_id
     event = asyncio.Event()
     # create a map entry between the event and the request_id above
@@ -43,14 +48,14 @@ async def passthrough(request: Request, proxy_path: str = ''):
     }
 
     try:
+        request_body = await request.body()
         forward_request = {
             'request_id': request_id,
             'method': request.method,
-            'url': str(request.url),
+            'url': target_url,
             'http_version': '',
-            'headers': '',
-            # TODO: set body in case of other method than GET.
-            'body': ''
+            'headers': request.headers,
+            'body': request_body
             }
         data = pickle.dumps(forward_request)
         topic = f'devices/{request.url.hostname}/request' 
